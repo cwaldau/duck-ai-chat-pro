@@ -4,6 +4,8 @@
 // @version      1.2
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
+// @downloadURL  https://github.com/cwaldau/duck-ai-chat-pro/raw/refs/heads/main/duck-ai-chat-pro.user.js
+// @updateURL    https://github.com/cwaldau/duck-ai-chat-pro/raw/refs/heads/main/duck-ai-chat-pro.user.js
 // @match        https://duck.ai/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js
