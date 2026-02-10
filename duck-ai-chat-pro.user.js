@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -1280,6 +1280,9 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                     return;
                 }
 
+                // Configuration: minimum lines required to convert to file panel
+                const MIN_LINES_FOR_FILE_PANEL = 5;
+
                 // Find all code blocks that haven't been converted
                 const codeBlocks = element.querySelectorAll('pre:not(.file-panel-converted)');
 
@@ -1291,6 +1294,14 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                     const code = codeElement.textContent;
 
                     if (!code.trim()) continue;
+
+                    // Count non-empty lines
+                    const lines = code.split('\n').filter(line => line.trim().length > 0);
+
+                    // Skip conversion if below minimum line threshold
+                    if (lines.length <= MIN_LINES_FOR_FILE_PANEL) {
+                        continue;
+                    }
 
                     let filename = 'code.txt';
                     let detectedLang = '';
