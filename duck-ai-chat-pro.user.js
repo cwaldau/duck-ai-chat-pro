@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -1126,8 +1126,12 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 if (wrapper) {
                     wrapper.classList.remove('code-panel-open');
                 }
-                // Remove active state from all file panels
-                document.querySelectorAll('.file-panel').forEach(p => p.classList.remove('active'));
+                // Remove active state from all file panels and reset button text
+                document.querySelectorAll('.file-panel').forEach(p => {
+                    p.classList.remove('active');
+                    const btn = p.querySelector('.file-view-button');
+                    if (btn) btn.textContent = 'View';
+                });
                 this.currentFile = null;
 
                 // Restore sidebar if it was open before
@@ -1368,15 +1372,38 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 const file = this.files.get(fileId);
                 if (!file) return;
 
-                // Collapse sidebar when opening code panel
-                collapseSidebarIfNeeded();
+                // Check if clicking on already active panel
+                const isAlreadyActive = file.element.classList.contains('active');
+
+                if (isAlreadyActive) {
+                    // Close the panel if it's already active
+                    this.closePanel();
+                    return;
+                }
+
+                // Check if code panel is currently closed (before opening)
+                const wrapper = document.querySelector('.chat-code-wrapper');
+                const codePanelWasClosed = wrapper && !wrapper.classList.contains('code-panel-open');
+
+                // Only collapse sidebar if we're opening the code panel for the first time
+                if (codePanelWasClosed) {
+                    collapseSidebarIfNeeded();
+                }
 
                 // Update active state
-                document.querySelectorAll('.file-panel').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.file-panel').forEach(p => {
+                    p.classList.remove('active');
+                    // Reset all "View" buttons
+                    const btn = p.querySelector('.file-view-button');
+                    if (btn) btn.textContent = 'View';
+                });
                 file.element.classList.add('active');
 
+                // Update button text to "Close"
+                const activeBtn = file.element.querySelector('.file-view-button');
+                if (activeBtn) activeBtn.textContent = 'Close';
+
                 // Show code panel by adding class to wrapper
-                const wrapper = document.querySelector('.chat-code-wrapper');
                 if (wrapper) {
                     wrapper.classList.add('code-panel-open');
                 }
