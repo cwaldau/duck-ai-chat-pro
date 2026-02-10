@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
+// @license      GNU GPLv3
 // @downloadURL  https://github.com/cwaldau/duck-ai-chat-pro/raw/refs/heads/main/duck-ai-chat-pro.user.js
 // @updateURL    https://github.com/cwaldau/duck-ai-chat-pro/raw/refs/heads/main/duck-ai-chat-pro.user.js
 // @match        https://duck.ai/*
