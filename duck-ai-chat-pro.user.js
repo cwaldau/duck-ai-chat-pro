@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -50,14 +50,39 @@
         injectStyles(); // duck.ai custom styles (inline)
         injectPrismCSS(); // fetch and inject Prism CSS safely
         setupCodePanel();
+        setupToggleButton();
     }
 
     // Sidebar management
     let sidebarWasCollapsed = false;
 
+    // Code conversion toggle state (default: enabled)
+    let codeConversionEnabled = true;
+
+    // Load saved preference from localStorage
+    try {
+        const saved = localStorage.getItem('duck-ai-code-conversion-enabled');
+        if (saved !== null) {
+            codeConversionEnabled = saved === 'true';
+        }
+    } catch (e) {
+        console.warn('Could not load code conversion preference:', e);
+    }
+
+    // Save preference to localStorage
+    function saveCodeConversionPreference(enabled) {
+        try {
+            localStorage.setItem('duck-ai-code-conversion-enabled', enabled.toString());
+        } catch (e) {
+            console.warn('Could not save code conversion preference:', e);
+        }
+    }
+
     function getSidebar() {
-        // Find the sidebar - it contains the chat list and settings
-        return document.querySelector('section.kc6VuoBdpB9ul8xqj6kl');
+        // Find sidebar by stable structural selectors, not obfuscated classes
+        return document.querySelector('section[class]') ||
+               document.querySelector('aside') ||
+               document.querySelector('nav');
     }
 
     function getSidebarToggle() {
@@ -94,10 +119,345 @@
         }
     }
 
+    function setupToggleButton() {
+        // Wait for sidebar to be available, then insert
+        let attempts = 0;
+        const check = setInterval(() => {
+            attempts++;
+            const sidebar = getSidebar();
+            if (sidebar && sidebar.querySelector('button')) {
+                clearInterval(check);
+                // Only insert if sidebar is not collapsed
+                if (!isSidebarCollapsed()) {
+                    insertToggleButton(sidebar);
+                }
+                // Watch for sidebar changes (collapse/expand)
+                observeSidebarChanges();
+            } else if (attempts > 50) {
+                clearInterval(check);
+            }
+        }, 100);
+    }
+
+    function observeSidebarChanges() {
+        // Watch for sidebar being replaced/modified
+        const app = document.getElementById('app');
+        if (!app) return;
+
+        let lastSidebarCollapsed = isSidebarCollapsed();
+
+        const observer = new MutationObserver(() => {
+            const currentlyCollapsed = isSidebarCollapsed();
+
+            // Sidebar was collapsed and is now expanded
+            if (lastSidebarCollapsed && !currentlyCollapsed) {
+                const sidebar = getSidebar();
+                // Check if toggle is missing
+                if (sidebar && !document.getElementById('code-conversion-toggle')) {
+                    insertToggleButton(sidebar);
+                }
+            }
+
+            lastSidebarCollapsed = currentlyCollapsed;
+        });
+
+        observer.observe(app, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    function insertToggleButton(sidebar) {
+        const toggleContainer = document.createElement('div');
+        toggleContainer.className = 'code-conversion-toggle-container';
+        toggleContainer.innerHTML = `
+            <button class="code-conversion-toggle" id="code-conversion-toggle" title="Toggle code block conversion">
+                <div class="toggle-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    <span class="toggle-label">Code Panels</span>
+                </div>
+                <div class="toggle-switch">
+                    <div class="toggle-slider"></div>
+                </div>
+            </button>
+        `;
+
+        // Find insertion point using stable text content - never rely on obfuscated classes
+        // Strategy 1: insert after the "Chat Protection" button
+        const allButtons = Array.from(sidebar.querySelectorAll('button'));
+        const chatProtectionBtn = allButtons.find(btn =>
+            btn.textContent.trim().includes('Chat Protection')
+        );
+
+        if (chatProtectionBtn) {
+            chatProtectionBtn.insertAdjacentElement('afterend', toggleContainer);
+        } else {
+            // Strategy 2: insert before the DuckDuckGo footer text
+            const allEls = Array.from(sidebar.querySelectorAll('span, div'));
+            const ddgText = allEls.find(el =>
+                el.children.length === 0 && el.textContent.trim() === 'DuckDuckGo'
+            );
+            if (ddgText) {
+                // Walk up to find the ancestor that is a direct child of sidebar
+                let ancestor = ddgText.parentElement;
+                while (ancestor && ancestor.parentElement !== sidebar) {
+                    ancestor = ancestor.parentElement;
+                }
+                if (ancestor) {
+                    sidebar.insertBefore(toggleContainer, ancestor);
+                } else {
+                    sidebar.appendChild(toggleContainer);
+                }
+            } else {
+                // Strategy 3: just append
+                sidebar.appendChild(toggleContainer);
+            }
+        }
+
+        // Set initial state
+        const toggleBtn = document.getElementById('code-conversion-toggle');
+        if (!toggleBtn) return;
+        if (codeConversionEnabled) toggleBtn.classList.add('enabled');
+
+        // Click handler
+        toggleBtn.addEventListener('click', () => {
+            codeConversionEnabled = !codeConversionEnabled;
+            saveCodeConversionPreference(codeConversionEnabled);
+
+            if (codeConversionEnabled) {
+                toggleBtn.classList.add('enabled');
+                const chatWrapper = document.querySelector('.chat-wrapper');
+                if (chatWrapper && window.codeManager) {
+                    window.codeManager.convertCodeBlocks(chatWrapper);
+                }
+            } else {
+                toggleBtn.classList.remove('enabled');
+                if (window.codeManager) {
+                    window.codeManager.closePanel();
+                    window.codeManager.revertAllFilePanels();
+                }
+            }
+        });
+    }
+
     function injectStyles() {
         const style = document.createElement('style');
         style.textContent = `
 /* ==================== CLAUDE-STYLE CODE OUTPUT STYLES ==================== */
+
+/* Reverted code block styles - matches Duck.ai's native appearance */
+.duck-code-block {
+    box-sizing: border-box;
+    background-color: var(--sds-color-background-container-pre) !important;
+    border: 1px solid var(--sds-color-palette-shade-06);
+    border-radius: var(--sds-radius-x03);
+    margin: 8px 0;
+}
+
+.duck-code-header {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--sds-space-x03) var(--sds-space-x03) var(--sds-space-x02) var(--sds-space-x04) !important;
+}
+
+.duck-code-lang-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.duck-code-lang-container * {
+    color: var(--sds-color-text-on-dark-02);
+    font-size: var(--sds-font-size-label) !important;
+}
+
+.duck-code-lang-container i {
+  width: 16px;
+  height: 16px;
+}
+
+.duck-code-lang-label {
+    font-family: var(--sds-font-family-monospace) !important;
+    line-height: 2 !important;
+    margin: 0;
+}
+
+.duck-code-button-container {
+    position: relative;
+}
+
+.duck-code-copy-btn,
+.duck-code-copied-btn {
+    color: var(--sds-color-text-accent-01);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    animation: none;
+    text-transform: capitalize;
+    transition: opacity 0.25s ease-in-out;
+    opacity: 1;
+    font-weight: var(--sds-font-weight-normal);
+    padding: 4px 8px !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--sds-font-size-label);
+}
+
+.duck-code-copy-btn:hover,
+.duck-code-copied-btn:hover {
+    background-color: var(--theme-col-bg-button-ghost-hover);
+    border-radius: var(--rounded-md);
+}
+
+.duck-code-copy-btn svg,
+.duck-code-copied-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.duck-code-copied-btn {
+    cursor: default;
+    position: absolute;
+    right: 0;
+    width: max-content;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.duck-code-content {
+    color: var(--sds-color-text-01);
+    font-family: var(--sds-font-family-monospace);
+    direction: ltr;
+    text-align: left;
+    white-space: pre;
+    word-spacing: normal;
+    word-break: normal;
+    font-size: var(--sds-font-size-label);
+    line-height: var(--sds-font-line-height-body);
+    tab-size: 4;
+    hyphens: none;
+    padding: var(--sds-space-x02, 8px) var(--sds-space-x04, 16px) var(--sds-space-x04, 16px) !important;
+    margin: 0;
+    overflow: auto;
+    border: none;
+    background: transparent;
+}
+
+.duck-code-content code {
+    color: var(--sds-color-text-01);
+    font-family: var(--sds-font-family-monospace) !important;
+    font-size: var(--sds-font-size-label) !important;
+    line-height: var(--sds-font-line-height-body);
+    background-color: transparent;
+    white-space: pre-wrap !important;
+    word-wrap: break-word;
+    display: block;
+    background: 0 0 !important;
+}
+
+.duck-code-content span {
+    background-color: transparent;
+}
+
+/* Toggle button in sidebar */
+.code-conversion-toggle-container {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.code-conversion-toggle-container button {
+    border-radius: var(--sds-radius-x03);
+    padding: 8px var(--sds-space-x03);
+}
+
+.code-conversion-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+    color: inherit;
+    white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.code-conversion-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.toggle-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.code-conversion-toggle svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.toggle-label {
+    font-weight: 400;
+    text-align: left;
+    font-size: 14px;
+}
+
+.toggle-switch {
+    width: 36px;
+    height: 20px;
+    background: #ccc;
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.code-conversion-toggle.enabled .toggle-switch {
+    background: #2196f3;
+}
+
+.toggle-slider {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.code-conversion-toggle.enabled .toggle-slider {
+    transform: translateX(16px);
+}
+
+/* Dark theme support for toggle */
+.set-theme--dark .code-conversion-toggle:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.set-theme--dark .toggle-switch {
+    background: #555;
+}
+
+.set-theme--dark .code-conversion-toggle.enabled .toggle-switch {
+    background: #2196f3;
+}
 
 /* Keep the app container as is, but add wrapper for split view */
 .chat-code-wrapper {
@@ -476,30 +836,62 @@
     color: #666;
 }
 
+.set-theme--dark .code-conversion-toggle {
+    color: var(--sds-color-text-01);
+}
+
+.set-theme--dark .code-conversion-toggle:hover {
+    background-color: var(--theme-col-bg-button-ghostsecondary-hover);
+    border-color: var(--theme-col-border-button-ghostsecondary-hover);
+}
+
 /* Dark theme: VS Code "Dark Modern"-style colors in code panel */
 .set-theme--dark .code-panel-content pre[class*="language-"],
-.set-theme--dark .code-panel-content code[class*="language-"] {
+.set-theme--dark .code-panel-content code[class*="language-"],
+.set-theme--dark pre.duck-code-block,
+.set-theme--dark .duck-code-block code[class*="language-"] {
     background: #1e1e1e !important; /* editor background */
     color: #d4d4d4 !important;      /* editor foreground */
     text-shadow: none !important;
 }
 
 /* Make the content wrapper match so gaps/empty areas are the same color */
-.set-theme--dark .code-panel-content .code-content-wrapper {
+.set-theme--dark .code-panel-content .code-content-wrapper,
+.set-theme--dark .duck-code-block .duck-code-content {
     background: #1e1e1e !important;
+}
+
+/* Dark theme: style the header area */
+.set-theme--dark .duck-code-block .duck-code-header {
+    background: #1e1e1e !important;
+    color: #d4d4d4 !important;
+}
+
+.set-theme--dark .duck-code-block .duck-code-lang-label {
+    color: #d4d4d4 !important;
+}
+
+.set-theme--dark .duck-code-block .duck-code-lang-container svg {
+    color: #d4d4d4 !important;
 }
 
 /* Comments */
 .set-theme--dark .code-panel-content .token.comment,
 .set-theme--dark .code-panel-content .token.prolog,
 .set-theme--dark .code-panel-content .token.doctype,
-.set-theme--dark .code-panel-content .token.cdata {
+.set-theme--dark .code-panel-content .token.cdata,
+.set-theme--dark .duck-code-block .token.comment,
+.set-theme--dark .duck-code-block .token.prolog,
+.set-theme--dark .duck-code-block .token.doctype,
+.set-theme--dark .duck-code-block .token.cdata {
     color: #6a9955 !important;
 }
 
 /* Keywords and control flow */
 .set-theme--dark .code-panel-content .token.keyword,
-.set-theme--dark .code-panel-content .token.operator {
+.set-theme--dark .code-panel-content .token.operator,
+.set-theme--dark .duck-code-block .token.keyword,
+.set-theme--dark .duck-code-block .token.operator {
     color: #c586c0 !important;
 }
 
@@ -507,33 +899,50 @@
 .set-theme--dark .code-panel-content .token.string,
 .set-theme--dark .code-panel-content .token.char,
 .set-theme--dark .code-panel-content .token.attr-value,
-.set-theme--dark .code-panel-content .token.builtin {
+.set-theme--dark .code-panel-content .token.builtin,
+.set-theme--dark .duck-code-block .token.string,
+.set-theme--dark .duck-code-block .token.char,
+.set-theme--dark .duck-code-block .token.attr-value,
+.set-theme--dark .duck-code-block .token.builtin,
+.set-theme--dark .duck-code-block .token.triple-quoted-string,
+.set-theme--dark .duck-code-block .token.string-interpolation .token.string {
     color: #ce9178 !important;
 }
 
 /* Functions / methods */
 .set-theme--dark .code-panel-content .token.function,
-.set-theme--dark .code-panel-content .token.method {
+.set-theme--dark .code-panel-content .token.method,
+.set-theme--dark .duck-code-block .token.function,
+.set-theme--dark .duck-code-block .token.method {
     color: #dcdcaa !important;
 }
 
 /* Numbers, booleans, constants */
 .set-theme--dark .code-panel-content .token.number,
 .set-theme--dark .code-panel-content .token.boolean,
-.set-theme--dark .code-panel-content .token.constant {
+.set-theme--dark .code-panel-content .token.constant,
+.set-theme--dark .duck-code-block .token.number,
+.set-theme--dark .duck-code-block .token.boolean,
+.set-theme--dark .duck-code-block .token.constant {
     color: #b5cea8 !important;
 }
 
 /* Properties, variables, classes */
 .set-theme--dark .code-panel-content .token.property,
 .set-theme--dark .code-panel-content .token.class-name,
-.set-theme--dark .code-panel-content .token.variable {
+.set-theme--dark .code-panel-content .token.variable,
+.set-theme--dark .duck-code-block .token.property,
+.set-theme--dark .duck-code-block .token.class-name,
+.set-theme--dark .duck-code-block .token.variable {
     color: #9cdcfe !important;
 }
 
 /* Punctuation and symbols */
 .set-theme--dark .code-panel-content .token.punctuation,
-.set-theme--dark .code-panel-content .token.symbol {
+.set-theme--dark .code-panel-content .token.symbol,
+.set-theme--dark .duck-code-block .token.punctuation,
+.set-theme--dark .duck-code-block .token.symbol,
+.set-theme--dark .duck-code-block .token.interpolation .token.punctuation {
     color: #d4d4d4 !important;
 }
 
@@ -542,7 +951,12 @@
 .set-theme--dark .code-panel-content .style .token.string,
 .set-theme--dark .code-panel-content .token.entity,
 .set-theme--dark .code-panel-content .token.operator,
-.set-theme--dark .code-panel-content .token.url {
+.set-theme--dark .code-panel-content .token.url,
+.set-theme--dark .duck-code-block .language-css .token.string,
+.set-theme--dark .duck-code-block .style .token.string,
+.set-theme--dark .duck-code-block .token.entity,
+.set-theme--dark .duck-code-block .token.operator,
+.set-theme--dark .duck-code-block .token.url {
     background: none !important;
 }
 
@@ -553,7 +967,14 @@
 .set-theme--dark .code-panel-content .token.number,
 .set-theme--dark .code-panel-content .token.property,
 .set-theme--dark .code-panel-content .token.symbol,
-.set-theme--dark .code-panel-content .token.tag {
+.set-theme--dark .code-panel-content .token.tag,
+.set-theme--dark .duck-code-block .token.boolean,
+.set-theme--dark .duck-code-block .token.constant,
+.set-theme--dark .duck-code-block .token.deleted,
+.set-theme--dark .duck-code-block .token.number,
+.set-theme--dark .duck-code-block .token.property,
+.set-theme--dark .duck-code-block .token.symbol,
+.set-theme--dark .duck-code-block .token.tag {
     color: #f44747 !important; /* VS Code Dark Modern–style red */
 }
         `;
@@ -713,6 +1134,120 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 restoreSidebarIfNeeded();
             },
 
+            revertAllFilePanels() {
+                // Find all file panels and convert them back to code blocks
+                const filePanels = document.querySelectorAll('.file-panel');
+
+                filePanels.forEach(panel => {
+                    // Get the file data from our map
+                    const fileData = Array.from(this.files.values()).find(f => f.element === panel);
+
+                    if (fileData) {
+                        // Determine language from extension
+                        const ext = fileData.filename.split('.').pop().toLowerCase();
+                        const langMap = {
+                            'js': 'javascript',
+                            'ts': 'typescript',
+                            'py': 'python',
+                            'html': 'html',
+                            'css': 'css',
+                            'json': 'json',
+                            'jsx': 'jsx',
+                            'tsx': 'tsx',
+                            'java': 'java',
+                            'cpp': 'cpp',
+                            'c': 'c',
+                            'cs': 'csharp',
+                            'rb': 'ruby',
+                            'go': 'go',
+                            'rs': 'rust',
+                            'php': 'php',
+                            'xml': 'xml',
+                            'yml': 'yaml',
+                            'yaml': 'yaml',
+                            'md': 'markdown',
+                            'sh': 'bash',
+                            'sql': 'sql'
+                        };
+
+                        const language = langMap[ext] || 'python';
+
+                        // Create the Duck.ai-style code block structure
+                        const pre = document.createElement('pre');
+                        pre.className = 'duck-code-block';
+
+                        // Header
+                        const header = document.createElement('div');
+                        header.className = 'duck-code-header';
+
+                        // Language container
+                        const langContainer = document.createElement('div');
+                        langContainer.className = 'duck-code-lang-container';
+
+                        const icon = document.createElement('i');
+                        icon.innerHTML = '<svg width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M15.434 7.51c.137.137.212.311.212.49a.694.694 0 0 1-.212.5l-3.54 3.5a.893.893 0 0 1-.277.18 1.024 1.024 0 0 1-.684.038.945.945 0 0 1-.302-.148.787.787 0 0 1-.213-.234.652.652 0 0 1-.045-.58.74.74 0 0 1 .175-.256l3.045-3-3.045-3a.69.69 0 0 1-.22-.55.723.723 0 0 1 .303-.52 1 1 0 0 1 .648-.186.962.962 0 0 1 .614.256l3.541 3.51Zm-12.281 0A.695.695 0 0 0 2.94 8a.694.694 0 0 0 .213.5l3.54 3.5a.893.893 0 0 0 .277.18 1.024 1.024 0 0 0 .684.038.945.945 0 0 0 .302-.148.788.788 0 0 0 .213-.234.651.651 0 0 0 .045-.58.74.74 0 0 0-.175-.256L4.994 8l3.045-3a.69.69 0 0 0 .22-.55.723.723 0 0 0-.303-.52 1 1 0 0 0-.648-.186.962.962 0 0 0-.615.256l-3.54 3.51Z"></path></svg>';
+
+                        const langLabel = document.createElement('p');
+                        langLabel.className = 'duck-code-lang-label';
+                        langLabel.textContent = language;
+
+                        langContainer.appendChild(icon);
+                        langContainer.appendChild(langLabel);
+
+                        header.appendChild(langContainer);
+
+                        /* Can't work due to needing to be event bound to duck.ai events, so just hide it
+                        // Button container
+                        const buttonContainer = document.createElement('div');
+                        buttonContainer.className = 'duck-code-button-container';
+
+                        const copyButton = document.createElement('button');
+                        copyButton.type = 'button';
+                        copyButton.className = 'duck-code-copy-btn';
+                        copyButton.setAttribute('data-copycode', 'true');
+                        copyButton.setAttribute('aria-label', 'Copy Code');
+                        copyButton.innerHTML = '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M9.975 1h.09a3.2 3.2 0 0 1 3.202 3.201v1.924a.754.754 0 0 1-.017.16l1.23 1.353A2 2 0 0 1 15 8.983V14a2 2 0 0 1-2 2H8a2 2 0 0 1-1.733-1H4.183a3.201 3.201 0 0 1-3.2-3.201V4.201a3.2 3.2 0 0 1 3.04-3.197A1.25 1.25 0 0 1 5.25 0h3.5c.604 0 1.109.43 1.225 1ZM4.249 2.5h-.066a1.7 1.7 0 0 0-1.7 1.701v7.598c0 .94.761 1.701 1.7 1.701H6V7a2 2 0 0 1 2-2h3.197c.195 0 .387.028.57.083v-.882A1.7 1.7 0 0 0 10.066 2.5H9.75c-.228.304-.591.5-1 .5h-3.5c-.41 0-.772-.196-1-.5ZM5 1.75v-.5A.25.25 0 0 1 5.25 1h3.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-3.5A.25.25 0 0 1 5 1.75ZM7.5 7a.5.5 0 0 1 .5-.5h3V9a1 1 0 0 0 1 1h1.5v4a.5.5 0 0 1-.5.5H8a.5.5 0 0 1-.5-.5V7Zm6 2v-.017a.5.5 0 0 0-.13-.336L12 7.14V9h1.5Z"></path></svg>Copy Code';
+
+                        const copiedButton = document.createElement('button');
+                        copiedButton.type = 'button';
+                        copiedButton.className = 'duck-code-copied-btn';
+                        copiedButton.innerHTML = '<svg fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" fill-rule="evenodd" d="M20.618 4.214a1 1 0 0 1 .168 1.404l-11 14a1 1 0 0 1-1.554.022l-5-6a1 1 0 0 1 1.536-1.28l4.21 5.05L19.213 4.382a1 1 0 0 1 1.404-.168Z" clip-rule="evenodd"></path></svg>Copied';
+
+                        buttonContainer.appendChild(copyButton);
+                        buttonContainer.appendChild(copiedButton);
+
+                        header.appendChild(buttonContainer);
+                        */
+
+                        // Code content
+                        const codeContainer = document.createElement('div');
+                        codeContainer.className = 'duck-code-content';
+
+                        const code = document.createElement('code');
+                        code.className = `language-${language}`;
+                        code.textContent = fileData.content;
+
+                        codeContainer.appendChild(code);
+
+                        // Assemble
+                        pre.appendChild(header);
+                        pre.appendChild(codeContainer);
+
+                        // Replace the file panel with the pre element
+                        const parent = panel.parentNode;
+                        parent.replaceChild(pre, panel);
+
+                        // Apply Prism syntax highlighting if available
+                        if (window.Prism && Prism.languages[language]) {
+                            Prism.highlightElement(code);
+                        }
+                    }
+                });
+
+                // Clear the files map since we've reverted everything
+                this.files.clear();
+            },
+
             observeChatForCode() {
                 const target = document.querySelector('.chat-wrapper');
                 if (!target) return;
@@ -740,6 +1275,11 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
             },
 
             async convertCodeBlocks(element) {
+                // Check if code conversion is enabled
+                if (!codeConversionEnabled) {
+                    return;
+                }
+
                 // Find all code blocks that haven't been converted
                 const codeBlocks = element.querySelectorAll('pre:not(.file-panel-converted)');
 
@@ -951,5 +1491,8 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 manager.convertCodeBlocks(chatWrapper);
             }
         }, 1000);
+
+        // Make manager accessible globally for toggle button
+        window.codeManager = manager;
     }
 })();
