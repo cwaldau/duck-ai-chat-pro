@@ -475,6 +475,87 @@
 .set-theme--dark .code-panel-empty {
     color: #666;
 }
+
+/* Dark theme: VS Code "Dark Modern"-style colors in code panel */
+.set-theme--dark .code-panel-content pre[class*="language-"],
+.set-theme--dark .code-panel-content code[class*="language-"] {
+    background: #1e1e1e !important; /* editor background */
+    color: #d4d4d4 !important;      /* editor foreground */
+    text-shadow: none !important;
+}
+
+/* Make the content wrapper match so gaps/empty areas are the same color */
+.set-theme--dark .code-panel-content .code-content-wrapper {
+    background: #1e1e1e !important;
+}
+
+/* Comments */
+.set-theme--dark .code-panel-content .token.comment,
+.set-theme--dark .code-panel-content .token.prolog,
+.set-theme--dark .code-panel-content .token.doctype,
+.set-theme--dark .code-panel-content .token.cdata {
+    color: #6a9955 !important;
+}
+
+/* Keywords and control flow */
+.set-theme--dark .code-panel-content .token.keyword,
+.set-theme--dark .code-panel-content .token.operator {
+    color: #c586c0 !important;
+}
+
+/* Strings */
+.set-theme--dark .code-panel-content .token.string,
+.set-theme--dark .code-panel-content .token.char,
+.set-theme--dark .code-panel-content .token.attr-value,
+.set-theme--dark .code-panel-content .token.builtin {
+    color: #ce9178 !important;
+}
+
+/* Functions / methods */
+.set-theme--dark .code-panel-content .token.function,
+.set-theme--dark .code-panel-content .token.method {
+    color: #dcdcaa !important;
+}
+
+/* Numbers, booleans, constants */
+.set-theme--dark .code-panel-content .token.number,
+.set-theme--dark .code-panel-content .token.boolean,
+.set-theme--dark .code-panel-content .token.constant {
+    color: #b5cea8 !important;
+}
+
+/* Properties, variables, classes */
+.set-theme--dark .code-panel-content .token.property,
+.set-theme--dark .code-panel-content .token.class-name,
+.set-theme--dark .code-panel-content .token.variable {
+    color: #9cdcfe !important;
+}
+
+/* Punctuation and symbols */
+.set-theme--dark .code-panel-content .token.punctuation,
+.set-theme--dark .code-panel-content .token.symbol {
+    color: #d4d4d4 !important;
+}
+
+/* Override Prism's semi-transparent background on some tokens */
+.set-theme--dark .code-panel-content .language-css .token.string,
+.set-theme--dark .code-panel-content .style .token.string,
+.set-theme--dark .code-panel-content .token.entity,
+.set-theme--dark .code-panel-content .token.operator,
+.set-theme--dark .code-panel-content .token.url {
+    background: none !important;
+}
+
+/* Dark theme: better contrast for red-ish tokens */
+.set-theme--dark .code-panel-content .token.boolean,
+.set-theme--dark .code-panel-content .token.constant,
+.set-theme--dark .code-panel-content .token.deleted,
+.set-theme--dark .code-panel-content .token.number,
+.set-theme--dark .code-panel-content .token.property,
+.set-theme--dark .code-panel-content .token.symbol,
+.set-theme--dark .code-panel-content .token.tag {
+    color: #f44747 !important; /* VS Code Dark Modern–style red */
+}
         `;
         document.head.appendChild(style);
     }
