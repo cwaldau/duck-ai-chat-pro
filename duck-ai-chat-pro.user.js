@@ -494,8 +494,6 @@
 .chat-wrapper [class*="chat-messages"],
 .chat-wrapper main {
     max-width: 100% !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
 }
