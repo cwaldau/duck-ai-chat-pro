@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -239,6 +239,144 @@
                     window.codeManager.closePanel();
                     window.codeManager.revertAllFilePanels();
                 }
+            }
+        });
+    }
+
+    /**
+     * TIMESTAMPS
+     */
+
+    const TS_TAG = '[Duck.ai timestamps]';
+    let tsScheduled = false;
+    let tsCache = {
+        chatId: null,
+        assistantMessages: null
+    };
+
+    function runWhenIdle(fn) {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(fn, { timeout: 2000 });
+        } else {
+            setTimeout(fn, 50);
+        }
+    }
+
+    function scheduleTimestamps(root) {
+        if (tsScheduled) return;
+        tsScheduled = true;
+
+        runWhenIdle(() => {
+            tsScheduled = false;
+            addAssistantTimestampsIn(root);
+        });
+    }
+
+    function loadChatsForTimestamps() {
+        try {
+            const raw = localStorage.getItem('savedAIChats');
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            console.warn(TS_TAG, 'failed to parse savedAIChats', e);
+            return null;
+        }
+    }
+
+    function getChatContext(chatId, requiredCount) {
+        const data = loadChatsForTimestamps();
+        if (!data) return null;
+
+        // Reuse chatId, but refresh assistantMessages if we need more
+        if (!chatId) return null;
+
+        let chat = data.chats.find(c => c.chatId === chatId);
+        if (!chat || !Array.isArray(chat.messages)) return null;
+
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
+
+        // If we already have cache for this chat and it's long enough, reuse it
+        if (tsCache.chatId === chatId &&
+            tsCache.assistantMessages &&
+            tsCache.assistantMessages.length >= requiredCount) {
+            return tsCache;
+        }
+
+        tsCache = { chatId, assistantMessages };
+        return tsCache;
+    }
+
+    // Extract chatId from an assistant message id:
+    // "72eb1718-...-assistant-message-0-1" → "72eb1718-..."
+    function getChatIdFromAssistantNode(node) {
+        if (!node || !node.id) return null;
+        const match = node.id.match(/^([0-9a-fA-F-]+)-assistant-message/);
+        return match ? match[1] : null;
+    }
+
+    function formatTimestamp(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,   // set false for 24h
+            second: undefined
+        });
+    }
+
+    // Add timestamps to assistant messages within a given root (e.g. chat-wrapper or a new node)
+    function addAssistantTimestampsIn(root) {
+        if (!root) return;
+
+        // Find any assistant node to get chatId
+        const firstAssistant = root.querySelector('div[id*="-assistant-message-"]:not([id^="heading-"])');
+        if (!firstAssistant) return;
+
+        const chatId = getChatIdFromAssistantNode(firstAssistant);
+        if (!chatId) return;
+
+        // All *outer* assistant nodes currently in DOM
+        const assistantNodes = Array.from(
+            root.querySelectorAll('div[id*="-assistant-message-"]:not([id^="heading-"])')
+        );
+        if (!assistantNodes.length) return;
+
+        // Make sure we have at least this many assistant messages in cache
+        const ctx = getChatContext(chatId, assistantNodes.length);
+        if (!ctx) return;
+
+        const { assistantMessages } = ctx;
+
+        assistantNodes.forEach((node, idx) => {
+            const msg = assistantMessages[idx];
+            if (!msg || !msg.createdAt) return;
+
+            if (node.querySelector('.duckai-timestamp')) return;
+
+            const span = document.createElement('span');
+            span.className = 'duckai-timestamp';
+            span.textContent = formatTimestamp(msg.createdAt);
+
+            span.style.opacity = '0.6';
+            span.style.fontSize = '0.75rem';
+            span.style.marginLeft = '0.5rem';
+            span.style.display = 'inline-flex';
+            span.style.alignItems = 'center';
+            span.style.whiteSpace = 'nowrap';
+
+            const directDivChildren = Array.from(node.children).filter(
+                el => el.tagName === 'DIV'
+            );
+            const footer = directDivChildren[directDivChildren.length - 1] || node;
+
+            // For row-reverse flex: insert first so it appears visually last
+            if (footer.firstChild) {
+                footer.insertBefore(span, footer.firstChild);
+            } else {
+                footer.appendChild(span);
             }
         });
     }
@@ -1254,6 +1392,8 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 const target = document.querySelector('.chat-wrapper');
                 if (!target) return;
 
+                // timestamps on existing assistant messages
+                scheduleTimestamps(target);
 
                 const observer = new MutationObserver((mutations) => {
                     for (const m of mutations) {
@@ -1266,6 +1406,9 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                             } else {
                                 this.convertCodeBlocks(node);
                             }
+
+                            // timestamps on any new assistant messages
+                            scheduleTimestamps(target);
                         }
                     }
                 });
