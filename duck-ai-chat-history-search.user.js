@@ -238,8 +238,8 @@ function waitForElement(selector) {
 }
 
 GM_addStyle(`
-/* Make space for the search bubble at the top without blocking the first message */
-body > div > div > div > main > section:nth-of-type(2) > div:nth-of-type(3) > div:first-of-type {
+/* Make space for the search bubble at the top without blocking the first message or "free plan" text on new messages */
+body > div > div > div > main > section:nth-of-type(2) > div:nth-of-type(2) {
   padding-top: 60px !important;
 }
 /* Light theme (default) */
