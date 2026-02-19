@@ -506,7 +506,7 @@
     padding: 0;
     margin: 0;
     overflow: hidden;
-    min-width: 0;
+    width: 100%;
     flex-shrink: 0;
 }
 
