@@ -91,10 +91,13 @@
     }
 
     function isSidebarCollapsed() {
-        const sidebar = getSidebar();
-        if (!sidebar) return false;
-        // Check if sidebar is hidden or has minimal width
-        return sidebar.offsetWidth < 100 || sidebar.style.display === 'none';
+        try {
+            return localStorage.getItem('duckaiSidebarCollapsed') === 'true';
+        } catch (e) {
+            const sidebar = getSidebar();
+            if (!sidebar) return false;
+            return sidebar.offsetWidth < 100 || sidebar.style.display === 'none';
+        }
     }
 
     function toggleSidebar() {
@@ -120,23 +123,60 @@
     }
 
     function setupToggleButton() {
-        // Wait for sidebar to be available, then insert
         let attempts = 0;
         const check = setInterval(() => {
             attempts++;
             const sidebar = getSidebar();
             if (sidebar && sidebar.querySelector('button')) {
                 clearInterval(check);
-                // Only insert if sidebar is not collapsed
-                if (!isSidebarCollapsed()) {
-                    insertToggleButton(sidebar);
-                }
-                // Watch for sidebar changes (collapse/expand)
-                observeSidebarChanges();
+                insertToggleButton(sidebar);
+                watchSidebarState();
             } else if (attempts > 50) {
                 clearInterval(check);
             }
         }, 100);
+    }
+
+    function watchSidebarState() {
+        updateToggleVisibility();
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'duckaiSidebarCollapsed') {
+                updateToggleVisibility();
+            }
+        });
+
+        const originalSetItem = localStorage.setItem.bind(localStorage);
+        localStorage.setItem = function(key, value) {
+            originalSetItem(key, value);
+            if (key === 'duckaiSidebarCollapsed') {
+                setTimeout(updateToggleVisibility, 50);
+            }
+        };
+
+        const sidebar = getSidebar();
+        if (sidebar) {
+            const observer = new MutationObserver(() => {
+                updateToggleVisibility();
+            });
+            observer.observe(sidebar, {
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+    }
+
+    function updateToggleVisibility() {
+        const toggleContainer = document.querySelector('.code-conversion-toggle-container');
+        if (!toggleContainer) return;
+
+        const sidebarCollapsed = isSidebarCollapsed();
+
+        if (sidebarCollapsed) {
+            toggleContainer.style.display = 'none';
+        } else {
+            toggleContainer.style.display = '';
+        }
     }
 
     function observeSidebarChanges() {
