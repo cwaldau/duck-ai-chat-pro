@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -475,35 +475,60 @@
 
         const { assistantMessages } = ctx;
 
+        // We also need user messages for the user timestamp injection
+        const chat = await loadChatFromIndexedDB(chatId);
+        const userMessages = chat && Array.isArray(chat.messages)
+            ? chat.messages.filter(m => m.role === 'user')
+            : [];
+
         assistantNodes.forEach((node, idx) => {
-            const msg = assistantMessages[idx];
-            if (!msg || !msg.createdAt) return;
+            // ── Assistant timestamp ──────────────────────────────────────────
+            const assistantMsg = assistantMessages[idx];
+            if (assistantMsg && assistantMsg.createdAt && !node.querySelector('.duckai-timestamp')) {
+                const span = makeTimestampSpan(assistantMsg.createdAt);
 
-            if (node.querySelector('.duckai-timestamp')) return;
+                const directDivChildren = Array.from(node.children).filter(el => el.tagName === 'DIV');
+                const footer = directDivChildren[directDivChildren.length - 1] || node;
 
-            const span = document.createElement('span');
-            span.className = 'duckai-timestamp';
-            span.textContent = formatTimestamp(msg.createdAt);
+                if (footer.firstChild) {
+                    footer.insertBefore(span, footer.firstChild);
+                } else {
+                    footer.appendChild(span);
+                }
+            }
 
-            span.style.opacity = '0.6';
-            span.style.fontSize = '0.75rem';
-            span.style.marginLeft = '0.5rem';
-            span.style.display = 'inline-flex';
-            span.style.alignItems = 'center';
-            span.style.whiteSpace = 'nowrap';
+            // ── User timestamp ───────────────────────────────────────────────
+            // The user message is the sibling immediately above the assistant node
+            const userNode = node.previousElementSibling;
+            const userMsg  = userMessages[idx];
 
-            const directDivChildren = Array.from(node.children).filter(
-                el => el.tagName === 'DIV'
-            );
-            const footer = directDivChildren[directDivChildren.length - 1] || node;
+            if (userNode && userMsg && userMsg.createdAt && !userNode.querySelector('.duckai-timestamp')) {
+                const span = makeTimestampSpan(userMsg.createdAt);
 
-            // For row-reverse flex: insert first so it appears visually last
-            if (footer.firstChild) {
-                footer.insertBefore(span, footer.firstChild);
-            } else {
-                footer.appendChild(span);
+                // User bubble has 2 nested divs; inject into the 2nd one
+                const directDivChildren = Array.from(userNode.children).filter(el => el.tagName === 'DIV');
+                const target = directDivChildren[1] || directDivChildren[0] || userNode;
+
+                if (target.firstChild) {
+                    target.insertBefore(span, target.firstChild);
+                } else {
+                    target.appendChild(span);
+                }
             }
         });
+    }
+
+    function makeTimestampSpan(iso) {
+        const span = document.createElement('span');
+        span.className = 'duckai-timestamp';
+        span.textContent = formatTimestamp(iso);
+        span.style.opacity    = '0.6';
+        span.style.fontSize   = '0.75rem';
+        span.style.marginLeft = '0.5rem';
+        span.style.display    = 'inline-flex';
+        span.style.alignItems = 'center';
+        span.style.whiteSpace = 'nowrap';
+        return span;
     }
 
     function injectStyles() {
