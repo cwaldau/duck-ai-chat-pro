@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -312,36 +312,121 @@
         });
     }
 
-    function loadChatsForTimestamps() {
+    // ── IndexedDB helpers ────────────────────────────────────────────────────
+
+    // IndexedDB location: savedAiChatData (default) > saved-chats > <chatId>
+    const IDB_NAME  = 'savedAIChatData';
+    const IDB_STORE = 'saved-chats';
+
+    /**
+     * Open the duck.ai IndexedDB database at its current version.
+     * We first probe for the existing version via indexedDB.databases() (where
+     * available) or a version-1 open, then re-open at that exact version so we
+     * never trigger onupgradeneeded and never create a shadow database.
+     * Returns a Promise<IDBDatabase>.
+     */
+    async function openDuckAIDatabase() {
+        // Preferred path: modern browsers expose indexedDB.databases()
+        if (typeof indexedDB.databases === 'function') {
+            const list = await indexedDB.databases();
+            const entry = list.find(d => d.name === IDB_NAME);
+            if (!entry) {
+                throw new Error(`${TS_TAG} IndexedDB "${IDB_NAME}" not found`);
+            }
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(IDB_NAME, entry.version);
+                req.onsuccess       = () => resolve(req.result);
+                req.onerror         = () => reject(req.error);
+                req.onupgradeneeded = () => req.transaction.abort(); // should never fire
+            });
+        }
+
+        // Fallback: open at version 1 just to read the real version, then reopen
+        const version = await new Promise((resolve, reject) => {
+            const probe = indexedDB.open(IDB_NAME, 1);
+            probe.onsuccess = () => {
+                const v = probe.result.version;
+                probe.result.close();
+                resolve(v);
+            };
+            probe.onerror         = () => reject(probe.error);
+            probe.onupgradeneeded = (e) => {
+                // DB didn't exist at v1 — abort so we don't create it
+                e.target.transaction.abort();
+                reject(new Error(`${TS_TAG} "${IDB_NAME}" does not exist`));
+            };
+        });
+
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(IDB_NAME, version);
+            req.onsuccess       = () => resolve(req.result);
+            req.onerror         = () => reject(req.error);
+            req.onupgradeneeded = () => req.transaction.abort();
+        });
+    }
+
+    /**
+     * Read a single chat record by chatId from IndexedDB.
+     * Returns a Promise<object|null> – the parsed chat object or null if not found.
+     *
+     * Duck.ai stores each chat as a JSON-stringified value whose top-level keys
+     * are: title, model, messages.
+     */
+    async function loadChatFromIndexedDB(chatId) {
+        let db;
         try {
-            const raw = localStorage.getItem('savedAIChats');
-            if (!raw) return null;
-            return JSON.parse(raw);
+            db = await openDuckAIDatabase();
         } catch (e) {
-            console.warn(TS_TAG, 'failed to parse savedAIChats', e);
+            console.warn(TS_TAG, 'could not open IndexedDB', e);
             return null;
+        }
+
+        try {
+            const result = await new Promise((resolve, reject) => {
+                const tx  = db.transaction(IDB_STORE, 'readonly');
+                const req = tx.objectStore(IDB_STORE).get(chatId);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror   = () => reject(req.error);
+            });
+
+            if (result === undefined || result === null) return null;
+
+            // Value may be a raw object or a JSON string
+            if (typeof result === 'string') {
+                try { return JSON.parse(result); } catch { return null; }
+            }
+            return result;
+        } catch (e) {
+            console.warn(TS_TAG, 'error reading from IndexedDB store', e);
+            return null;
+        } finally {
+            db.close();
         }
     }
 
-    function getChatContext(chatId, requiredCount) {
-        const data = loadChatsForTimestamps();
-        if (!data) return null;
+    // ── Cache & lookup ────────────────────────────────────────────────────────
 
-        // Reuse chatId, but refresh assistantMessages if we need more
+    /**
+     * Return cached assistant messages for chatId, or fetch from IndexedDB.
+     * requiredCount is used only to decide whether the existing cache is sufficient.
+     * Returns a Promise<{chatId, assistantMessages}|null>.
+     */
+    async function getChatContext(chatId, requiredCount) {
         if (!chatId) return null;
 
-        let chat = data.chats.find(c => c.chatId === chatId);
-        if (!chat || !Array.isArray(chat.messages)) return null;
-
-        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
-
-        // If we already have cache for this chat and it's long enough, reuse it
-        if (tsCache.chatId === chatId &&
+        // Reuse cache if it covers all the messages we need
+        if (
+            tsCache.chatId === chatId &&
             tsCache.assistantMessages &&
-            tsCache.assistantMessages.length >= requiredCount) {
+            tsCache.assistantMessages.length >= requiredCount
+        ) {
             return tsCache;
         }
 
+        const chat = await loadChatFromIndexedDB(chatId);
+        if (!chat || !Array.isArray(chat.messages)) return null;
+
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
         tsCache = { chatId, assistantMessages };
         return tsCache;
     }
@@ -368,7 +453,7 @@
     }
 
     // Add timestamps to assistant messages within a given root (e.g. chat-wrapper or a new node)
-    function addAssistantTimestampsIn(root) {
+    async function addAssistantTimestampsIn(root) {
         if (!root) return;
 
         // Find any assistant node to get chatId
@@ -384,8 +469,8 @@
         );
         if (!assistantNodes.length) return;
 
-        // Make sure we have at least this many assistant messages in cache
-        const ctx = getChatContext(chatId, assistantNodes.length);
+        // Fetch chat data from IndexedDB (async)
+        const ctx = await getChatContext(chatId, assistantNodes.length);
         if (!ctx) return;
 
         const { assistantMessages } = ctx;
