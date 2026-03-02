@@ -10,9 +10,11 @@
 // @run-at      document-load
 // @grant       GM_addStyle
 // @namespace   http://tampermonkey.net/
-// @version     1.3
+// @version     1.4
 // @icon        https://duck.ai/favicon.ico
 // ==/UserScript==
+
+const TS_TAG = '[Duck.ai Search]';
 
 const fuseOptions = {
     includeScore: true,
@@ -27,6 +29,162 @@ const fuseOptions = {
     ],
 };
 
+// ── IndexedDB helpers ────────────────────────────────────────────────────
+
+// IndexedDB location: savedAiChatData (default) > saved-chats > <chatId>
+const IDB_NAME  = 'savedAIChatData';
+const IDB_STORE = 'saved-chats';
+
+/**
+ * Open the duck.ai IndexedDB database at its current version.
+ * We first probe for the existing version via indexedDB.databases() (where
+ * available) or a version-1 open, then re-open at that exact version so we
+ * never trigger onupgradeneeded and never create a shadow database.
+ * Returns a Promise<IDBDatabase>.
+ */
+async function openDuckAIDatabase() {
+    // Preferred path: modern browsers expose indexedDB.databases()
+    if (typeof indexedDB.databases === 'function') {
+        const list = await indexedDB.databases();
+        const entry = list.find(d => d.name === IDB_NAME);
+        if (!entry) {
+            throw new Error(`${TS_TAG} IndexedDB "${IDB_NAME}" not found`);
+        }
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(IDB_NAME, entry.version);
+            req.onsuccess       = () => resolve(req.result);
+            req.onerror         = () => reject(req.error);
+            req.onupgradeneeded = () => req.transaction.abort(); // should never fire
+        });
+    }
+
+    // Fallback: open at version 1 just to read the real version, then reopen
+    const version = await new Promise((resolve, reject) => {
+        const probe = indexedDB.open(IDB_NAME, 1);
+        probe.onsuccess = () => {
+            const v = probe.result.version;
+            probe.result.close();
+            resolve(v);
+        };
+        probe.onerror         = () => reject(probe.error);
+        probe.onupgradeneeded = (e) => {
+            // DB didn't exist at v1 — abort so we don't create it
+            e.target.transaction.abort();
+            reject(new Error(`${TS_TAG} "${IDB_NAME}" does not exist`));
+        };
+    });
+
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, version);
+        req.onsuccess       = () => resolve(req.result);
+        req.onerror         = () => reject(req.error);
+        req.onupgradeneeded = () => req.transaction.abort();
+    });
+}
+
+/**
+ * Read a single chat record by chatId from IndexedDB.
+ * Returns a Promise<object|null> – the parsed chat object or null if not found.
+ *
+ * Duck.ai stores each chat as a JSON-stringified value whose top-level keys
+ * are: title, model, messages.
+ */
+async function loadChatFromIndexedDB(chatId) {
+    let db;
+    try {
+        db = await openDuckAIDatabase();
+    } catch (e) {
+        console.warn(TS_TAG, 'could not open IndexedDB', e);
+        return null;
+    }
+
+    try {
+        const result = await new Promise((resolve, reject) => {
+            const tx  = db.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).get(chatId);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror   = () => reject(req.error);
+        });
+
+        if (result === undefined || result === null) return null;
+
+        // Value may be a raw object or a JSON string
+        if (typeof result === 'string') {
+            try { return JSON.parse(result); } catch { return null; }
+        }
+        return result;
+    } catch (e) {
+        console.warn(TS_TAG, 'error reading from IndexedDB store', e);
+        return null;
+    } finally {
+        db.close();
+    }
+}
+
+/**
+ * Load all chats from IndexedDB.
+ * Returns a Promise<Array> of chat objects with chatId added to each.
+ */
+async function loadAllChatsFromIndexedDB() {
+    let db;
+    try {
+        db = await openDuckAIDatabase();
+    } catch (e) {
+        console.warn(TS_TAG, 'could not open IndexedDB', e);
+        return [];
+    }
+
+    try {
+        const chats = await new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const store = tx.objectStore(IDB_STORE);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror   = () => reject(req.error);
+        });
+
+        // Also get all keys (chatIds)
+        const chatIds = await new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const store = tx.objectStore(IDB_STORE);
+            const req = store.getAllKeys();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror   = () => reject(req.error);
+        });
+
+        // Parse and attach chatId to each chat
+        return chats.map((chat, index) => {
+            let parsedChat = chat;
+
+            // Value may be a raw object or a JSON string
+            if (typeof chat === 'string') {
+                try {
+                    parsedChat = JSON.parse(chat);
+                } catch {
+                    return null;
+                }
+            }
+
+            // Attach the chatId
+            if (parsedChat && chatIds[index]) {
+                parsedChat.chatId = chatIds[index];
+            }
+
+            return parsedChat;
+        }).filter(chat => chat !== null);
+
+    } catch (e) {
+        console.warn(TS_TAG, 'error reading all chats from IndexedDB', e);
+        return [];
+    } finally {
+        db.close();
+    }
+}
+
+// ── Main Script ──────────────────────────────────────────────────────────
+
+let cachedChats = [];
+
 function truncate(str, maxLength, fromStart = false) {
     if(str.length <= maxLength) return str;
 
@@ -36,16 +194,6 @@ function truncate(str, maxLength, fromStart = false) {
         return str.slice(0, maxLength - 3) + '...';
     }
 }
-
-function getStoredChats() {
-    try {
-        return JSON.parse(localStorage.savedAIChats).chats;
-    } catch {}
-
-    return null;
-}
-
-if(!getStoredChats()) return;
 
 const searchBarElem = document.createElement('input');
       searchBarElem.type = 'text';
@@ -67,14 +215,13 @@ const resultContainer = containerElem.querySelector('.dsu-result-container');
 const openBtn = document.createElement('div');
       openBtn.id = 'dsu-open-btn';
       openBtn.innerText = 'Search...';
-      openBtn.onclick = () => containerElem.showModal();
+      openBtn.onclick = async () => {
+          // Refresh chat data when opening search
+          cachedChats = await loadAllChatsFromIndexedDB();
+          containerElem.showModal();
+      };
 
 document.body.appendChild(containerElem);
-
-waitForElement('main section:nth-of-type(2)').then(secondMainSection => {
-  secondMainSection.style.position = secondMainSection.style.position || 'relative';
-  secondMainSection.appendChild(openBtn);
-});
 
 function getChatElemByTitle(title) {
     const divs = document.querySelectorAll('div[title]');
@@ -111,7 +258,7 @@ function createResultElem(result) {
 
     const resultTitleElem = resultElem.querySelector('.dsu-result-title');
     const matchContainerElem = resultElem.querySelector('.dsu-result-match-container');
-    const truncatedTitle = truncate(item.title, 60).replaceAll('\n', ' ');
+    const truncatedTitle = truncate(item.title || 'Untitled Chat', 60).replaceAll('\n', ' ');
 
     resultTitleElem.innerText = `Chat | ${truncatedTitle}`;
 
@@ -146,10 +293,12 @@ function createResultElem(result) {
             setTimeout(() => {
                 const messageElem = getMessageElem(chatId, refIndex, isUser);
 
-                messageElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                messageElem.classList.add('dsu-highlight');
+                if (messageElem) {
+                    messageElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    messageElem.classList.add('dsu-highlight');
 
-                setTimeout(() => messageElem.classList.remove('dsu-highlight'), 5000);
+                    setTimeout(() => messageElem.classList.remove('dsu-highlight'), 5000);
+                }
             }, 250);
         };
 
@@ -210,8 +359,7 @@ function search(e) {
         return;
     }
 
-    const chats = getStoredChats();
-    const results = new Fuse(chats, { ...fuseOptions, 'minMatchCharLength':  query.length })
+    const results = new Fuse(cachedChats, { ...fuseOptions, 'minMatchCharLength':  query.length })
                         .search(query);
 
     render(results);
@@ -236,6 +384,29 @@ function waitForElement(selector) {
     });
   });
 }
+
+// ── Initialization ───────────────────────────────────────────────────────
+
+(async function init() {
+    try {
+        // Load chats from IndexedDB on startup
+        cachedChats = await loadAllChatsFromIndexedDB();
+
+        if (cachedChats.length === 0) {
+            console.warn(TS_TAG, 'No chats found in IndexedDB');
+        } else {
+            console.log(TS_TAG, `Loaded ${cachedChats.length} chats from IndexedDB`);
+        }
+
+        // Add the search button to the UI
+        const secondMainSection = await waitForElement('main section:nth-of-type(2)');
+        secondMainSection.style.position = secondMainSection.style.position || 'relative';
+        secondMainSection.appendChild(openBtn);
+
+    } catch (error) {
+        console.error(TS_TAG, 'Initialization error:', error);
+    }
+})();
 
 GM_addStyle(`
 /* Make space for the search bubble at the top without blocking the first message or "free plan" text on new messages */
