@@ -31,3 +31,4 @@ Adds Claude-style split-view code panels to duck.ai (and maybe other future enha
     - 
 
 <img width="1919" height="1104" alt="duck-ai-chat-pro-screenshot" src="https://github.com/user-attachments/assets/935a90da-dba2-4d12-b181-6fb5bc5a28e0" />
+<img width="1919" height="1012" alt="image" src="https://github.com/user-attachments/assets/4da98ad5-0a2e-499f-920c-7fbb906fdec4" />
