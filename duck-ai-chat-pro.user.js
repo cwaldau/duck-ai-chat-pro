@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.9
+// @version      2.0
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -1550,8 +1550,12 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                         for (const node of m.addedNodes) {
                             if (node.nodeType !== 1) continue;
 
-                            // If the node itself is a <pre>
-                            if (node.tagName === 'PRE') {
+                            // Check for new code block structure
+                            if (node.hasAttribute && node.hasAttribute('data-streamdown')) {
+                                this.convertCodeBlocks(node.parentNode);
+                            }
+                            // Check for old structure
+                            else if (node.tagName === 'PRE') {
                                 this.convertCodeBlocks(node.parentNode);
                             } else {
                                 this.convertCodeBlocks(node);
@@ -1579,16 +1583,74 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 const MIN_LINES_FOR_FILE_PANEL = 5;
 
                 // Find all code blocks that haven't been converted
-                const codeBlocks = element.querySelectorAll('pre:not(.file-panel-converted)');
+                // New structure: div[data-streamdown="code-block"]
+                // Old structure: pre (not inside data-streamdown)
+                const newCodeBlocks = element.querySelectorAll('div[data-streamdown="code-block"]:not(.file-panel-converted)');
+                const oldCodeBlocks = element.querySelectorAll('pre:not(.file-panel-converted):not([data-streamdown])');
 
-                for (const block of codeBlocks) {
+                const allCodeBlocks = [...newCodeBlocks, ...oldCodeBlocks];
+
+                for (const block of allCodeBlocks) {
                     // Mark as converted
                     block.classList.add('file-panel-converted');
 
-                    const codeElement = block.querySelector('code') || block;
-                    const code = codeElement.textContent;
+                    let code, detectedLang;
 
-                    if (!code.trim()) continue;
+                    // Handle new Duck.ai structure (data-streamdown)
+                    if (block.hasAttribute('data-streamdown')) {
+                        // Language is in data-language attribute
+                        detectedLang = block.getAttribute('data-language') || '';
+
+                        // Code is inside the pre > code within the body
+                        const bodyDiv = block.querySelector('div[data-streamdown="code-block-body"]');
+                        const pre = bodyDiv?.querySelector('pre');
+                        const codeElement = pre?.querySelector('code');
+
+                        if (!codeElement) continue;
+
+                        // Extract text while preserving line breaks
+                        // The code has spans with class "block" for each line
+                        const lineSpans = codeElement.querySelectorAll('span.block');
+                        if (lineSpans.length > 0) {
+                            // Extract text from each line span and trim trailing newlines
+                            code = Array.from(lineSpans).map(span => {
+                                // Remove trailing newline/whitespace that's already in the span
+                                return span.textContent.replace(/\n$/, '');
+                            }).join('\n');
+                        } else {
+                            // Fallback to innerText which preserves some whitespace
+                            code = codeElement.innerText || codeElement.textContent;
+                        }
+                    } else {
+                        // Handle old structure
+                        const codeElement = block.querySelector('code') || block;
+                        code = codeElement.textContent;
+
+                        if (!code.trim()) continue;
+
+                        // Wait for language detection (old method)
+                        detectedLang = await new Promise((resolve) => {
+                            let tries = 0;
+                            const iv = setInterval(() => {
+                                const lang = findLang(block);
+                                if (lang || tries++ > 10) {
+                                    clearInterval(iv);
+                                    resolve(lang || '');
+                                }
+                            }, 100);
+                        });
+
+                        // Fallback: class-based detection
+                        if (!detectedLang) {
+                            const className = codeElement.className;
+                            if (className.includes('language-')) {
+                                const lang = className.match(/language-(\w+)/)?.[1];
+                                if (lang) detectedLang = lang;
+                            }
+                        }
+                    }
+
+                    if (!code || !code.trim()) continue;
 
                     // Count non-empty lines
                     const lines = code.split('\n').filter(line => line.trim().length > 0);
@@ -1598,33 +1660,9 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                         continue;
                     }
 
-                    let filename = 'code.txt';
-                    let detectedLang = '';
-
-                    // Wait for language detection
-                    detectedLang = await new Promise((resolve) => {
-                        let tries = 0;
-                        const iv = setInterval(() => {
-                            const lang = findLang(block);
-                            if (lang || tries++ > 10) {
-                                clearInterval(iv);
-                                resolve(lang || '');
-                            }
-                        }, 100);
-                    });
-
-                    // Fallback: class-based detection
-                    if (!detectedLang) {
-                        const className = codeElement.className;
-                        if (className.includes('language-')) {
-                            const lang = className.match(/language-(\w+)/)?.[1];
-                            if (lang) detectedLang = lang;
-                        }
-                    }
-
                     // Determine file extension
                     const ext = getExtensionFromLanguage(detectedLang);
-                    filename = `code.${ext}`;
+                    const filename = `code.${ext}`;
 
                     // Create and replace with file panel
                     const filePanel = this.createFilePanel(filename, code);
