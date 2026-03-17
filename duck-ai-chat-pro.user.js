@@ -1041,222 +1041,222 @@
 }
 
 /* Dark theme support */
-html[style*="color-scheme"][style*="dark"] .chat-wrapper {
+html[style*="color-scheme: dark"] .chat-wrapper {
     border-right-color: #333;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-panel {
+html[style*="color-scheme: dark"] .code-panel {
     background: #1a1a1a;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-panel-header {
+html[style*="color-scheme: dark"] .code-panel-header {
     background: #242424;
     border-bottom-color: #333;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-panel-filename {
+html[style*="color-scheme: dark"] .code-panel-filename {
     color: #e0e0e0;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-copy-button {
+html[style*="color-scheme: dark"] .code-copy-button {
     background: #2a2a2a;
     border-color: #444;
     color: #e0e0e0;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-copy-button:hover {
+html[style*="color-scheme: dark"] .code-copy-button:hover {
     background: #333;
     border-color: #555;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-panel-content pre {
+html[style*="color-scheme: dark"] .code-panel-content pre {
     background: #242424;
     border-color: #333;
     color: #e0e0e0;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-line-numbers {
+html[style*="color-scheme: dark"] .code-line-numbers {
     background: #1e1e1e;
     border-right-color: #333;
 }
 
-html[style*="color-scheme"][style*="dark"] .file-panel {
+html[style*="color-scheme: dark"] .file-panel {
     background: #2a2a2a;
     border-color: #333;
 }
 
-html[style*="color-scheme"][style*="dark"] .file-panel:hover {
+html[style*="color-scheme: dark"] .file-panel:hover {
     background: #333;
     border-color: #444;
 }
 
-html[style*="color-scheme"][style*="dark"] .file-name {
+html[style*="color-scheme: dark"] .file-name {
     color: #e0e0e0;
 }
 
-html[style*="color-scheme"][style*="dark"] .file-view-button {
+html[style*="color-scheme: dark"] .file-view-button {
     background: #333;
     border-color: #444;
     color: #aaa;
 }
 
-html[style*="color-scheme"][style*="dark"] .file-panel.active {
+html[style*="color-scheme: dark"] .file-panel.active {
     background: #1e3a5f;
     border-color: #2196f3;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-panel-empty {
+html[style*="color-scheme: dark"] .code-panel-empty {
     color: #666;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-conversion-toggle {
+html[style*="color-scheme: dark"] .code-conversion-toggle {
     color: var(--sds-color-text-01);
 }
 
-html[style*="color-scheme"][style*="dark"] .code-conversion-toggle:hover {
+html[style*="color-scheme: dark"] .code-conversion-toggle:hover {
     background-color: var(--theme-col-bg-button-ghostsecondary-hover);
     border-color: var(--theme-col-border-button-ghostsecondary-hover);
     background: rgba(255, 255, 255, 0.05);
 }
 
-html[style*="color-scheme"][style*="dark"] .toggle-switch {
+html[style*="color-scheme: dark"] .toggle-switch {
     background: #555;
 }
 
-html[style*="color-scheme"][style*="dark"] .code-conversion-toggle.enabled .toggle-switch {
+html[style*="color-scheme: dark"] .code-conversion-toggle.enabled .toggle-switch {
     background: #2196f3;
 }
 
 /* Dark theme: VS Code "Dark Modern"-style colors in code panel */
-html[style*="color-scheme"][style*="dark"] .code-panel-content pre[class*="language-"],
-html[style*="color-scheme"][style*="dark"] .code-panel-content code[class*="language-"],
-html[style*="color-scheme"][style*="dark"] pre.duck-code-block,
-html[style*="color-scheme"][style*="dark"] .duck-code-block code[class*="language-"] {
+html[style*="color-scheme: dark"] .code-panel-content pre[class*="language-"],
+html[style*="color-scheme: dark"] .code-panel-content code[class*="language-"],
+html[style*="color-scheme: dark"] pre.duck-code-block,
+html[style*="color-scheme: dark"] .duck-code-block code[class*="language-"] {
     background: #1e1e1e !important; /* editor background */
     color: #d4d4d4 !important;      /* editor foreground */
     text-shadow: none !important;
 }
 
 /* Make the content wrapper match so gaps/empty areas are the same color */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .code-content-wrapper,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .duck-code-content {
+html[style*="color-scheme: dark"] .code-panel-content .code-content-wrapper,
+html[style*="color-scheme: dark"] .duck-code-block .duck-code-content {
     background: #1e1e1e !important;
 }
 
 /* Dark theme: style the header area */
-html[style*="color-scheme"][style*="dark"] .duck-code-block .duck-code-header {
+html[style*="color-scheme: dark"] .duck-code-block .duck-code-header {
     background: #1e1e1e !important;
     color: #d4d4d4 !important;
 }
 
-html[style*="color-scheme"][style*="dark"] .duck-code-block .duck-code-lang-label {
+html[style*="color-scheme: dark"] .duck-code-block .duck-code-lang-label {
     color: #d4d4d4 !important;
 }
 
-html[style*="color-scheme"][style*="dark"] .duck-code-block .duck-code-lang-container svg {
+html[style*="color-scheme: dark"] .duck-code-block .duck-code-lang-container svg {
     color: #d4d4d4 !important;
 }
 
 /* Comments */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.comment,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.prolog,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.doctype,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.cdata,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.comment,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.prolog,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.doctype,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.cdata {
+html[style*="color-scheme: dark"] .code-panel-content .token.comment,
+html[style*="color-scheme: dark"] .code-panel-content .token.prolog,
+html[style*="color-scheme: dark"] .code-panel-content .token.doctype,
+html[style*="color-scheme: dark"] .code-panel-content .token.cdata,
+html[style*="color-scheme: dark"] .duck-code-block .token.comment,
+html[style*="color-scheme: dark"] .duck-code-block .token.prolog,
+html[style*="color-scheme: dark"] .duck-code-block .token.doctype,
+html[style*="color-scheme: dark"] .duck-code-block .token.cdata {
     color: #6a9955 !important;
 }
 
 /* Keywords and control flow */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.keyword,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.operator,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.keyword,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.operator {
+html[style*="color-scheme: dark"] .code-panel-content .token.keyword,
+html[style*="color-scheme: dark"] .code-panel-content .token.operator,
+html[style*="color-scheme: dark"] .duck-code-block .token.keyword,
+html[style*="color-scheme: dark"] .duck-code-block .token.operator {
     color: #c586c0 !important;
 }
 
 /* Strings */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.string,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.char,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.attr-value,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.builtin,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.string,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.char,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.attr-value,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.builtin,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.triple-quoted-string,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.string-interpolation .token.string {
+html[style*="color-scheme: dark"] .code-panel-content .token.string,
+html[style*="color-scheme: dark"] .code-panel-content .token.char,
+html[style*="color-scheme: dark"] .code-panel-content .token.attr-value,
+html[style*="color-scheme: dark"] .code-panel-content .token.builtin,
+html[style*="color-scheme: dark"] .duck-code-block .token.string,
+html[style*="color-scheme: dark"] .duck-code-block .token.char,
+html[style*="color-scheme: dark"] .duck-code-block .token.attr-value,
+html[style*="color-scheme: dark"] .duck-code-block .token.builtin,
+html[style*="color-scheme: dark"] .duck-code-block .token.triple-quoted-string,
+html[style*="color-scheme: dark"] .duck-code-block .token.string-interpolation .token.string {
     color: #ce9178 !important;
 }
 
 /* Functions / methods */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.function,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.method,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.function,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.method {
+html[style*="color-scheme: dark"] .code-panel-content .token.function,
+html[style*="color-scheme: dark"] .code-panel-content .token.method,
+html[style*="color-scheme: dark"] .duck-code-block .token.function,
+html[style*="color-scheme: dark"] .duck-code-block .token.method {
     color: #dcdcaa !important;
 }
 
 /* Numbers, booleans, constants */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.number,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.boolean,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.constant,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.number,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.boolean,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.constant {
+html[style*="color-scheme: dark"] .code-panel-content .token.number,
+html[style*="color-scheme: dark"] .code-panel-content .token.boolean,
+html[style*="color-scheme: dark"] .code-panel-content .token.constant,
+html[style*="color-scheme: dark"] .duck-code-block .token.number,
+html[style*="color-scheme: dark"] .duck-code-block .token.boolean,
+html[style*="color-scheme: dark"] .duck-code-block .token.constant {
     color: #b5cea8 !important;
 }
 
 /* Properties, variables, classes */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.property,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.class-name,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.variable,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.property,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.class-name,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.variable {
+html[style*="color-scheme: dark"] .code-panel-content .token.property,
+html[style*="color-scheme: dark"] .code-panel-content .token.class-name,
+html[style*="color-scheme: dark"] .code-panel-content .token.variable,
+html[style*="color-scheme: dark"] .duck-code-block .token.property,
+html[style*="color-scheme: dark"] .duck-code-block .token.class-name,
+html[style*="color-scheme: dark"] .duck-code-block .token.variable {
     color: #9cdcfe !important;
 }
 
 /* Punctuation and symbols */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.punctuation,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.symbol,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.punctuation,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.symbol,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.interpolation .token.punctuation {
+html[style*="color-scheme: dark"] .code-panel-content .token.punctuation,
+html[style*="color-scheme: dark"] .code-panel-content .token.symbol,
+html[style*="color-scheme: dark"] .duck-code-block .token.punctuation,
+html[style*="color-scheme: dark"] .duck-code-block .token.symbol,
+html[style*="color-scheme: dark"] .duck-code-block .token.interpolation .token.punctuation {
     color: #d4d4d4 !important;
 }
 
 /* Override Prism's semi-transparent background on some tokens */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .language-css .token.string,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .style .token.string,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.entity,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.operator,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.url,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .language-css .token.string,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .style .token.string,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.entity,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.operator,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.url {
+html[style*="color-scheme: dark"] .code-panel-content .language-css .token.string,
+html[style*="color-scheme: dark"] .code-panel-content .style .token.string,
+html[style*="color-scheme: dark"] .code-panel-content .token.entity,
+html[style*="color-scheme: dark"] .code-panel-content .token.operator,
+html[style*="color-scheme: dark"] .code-panel-content .token.url,
+html[style*="color-scheme: dark"] .duck-code-block .language-css .token.string,
+html[style*="color-scheme: dark"] .duck-code-block .style .token.string,
+html[style*="color-scheme: dark"] .duck-code-block .token.entity,
+html[style*="color-scheme: dark"] .duck-code-block .token.operator,
+html[style*="color-scheme: dark"] .duck-code-block .token.url {
     background: none !important;
 }
 
 /* Dark theme: better contrast for red-ish tokens */
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.boolean,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.constant,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.deleted,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.number,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.property,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.symbol,
-html[style*="color-scheme"][style*="dark"] .code-panel-content .token.tag,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.boolean,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.constant,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.deleted,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.number,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.property,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.symbol,
-html[style*="color-scheme"][style*="dark"] .duck-code-block .token.tag {
+html[style*="color-scheme: dark"] .code-panel-content .token.boolean,
+html[style*="color-scheme: dark"] .code-panel-content .token.constant,
+html[style*="color-scheme: dark"] .code-panel-content .token.deleted,
+html[style*="color-scheme: dark"] .code-panel-content .token.number,
+html[style*="color-scheme: dark"] .code-panel-content .token.property,
+html[style*="color-scheme: dark"] .code-panel-content .token.symbol,
+html[style*="color-scheme: dark"] .code-panel-content .token.tag,
+html[style*="color-scheme: dark"] .duck-code-block .token.boolean,
+html[style*="color-scheme: dark"] .duck-code-block .token.constant,
+html[style*="color-scheme: dark"] .duck-code-block .token.deleted,
+html[style*="color-scheme: dark"] .duck-code-block .token.number,
+html[style*="color-scheme: dark"] .duck-code-block .token.property,
+html[style*="color-scheme: dark"] .duck-code-block .token.symbol,
+html[style*="color-scheme: dark"] .duck-code-block .token.tag {
     color: #f44747 !important; /* VS Code Dark Modern–style red */
 }
         `;
