@@ -10,7 +10,7 @@
 // @run-at      document-load
 // @grant       GM_addStyle
 // @namespace   http://tampermonkey.net/
-// @version     1.4
+// @version     1.5
 // @icon        https://duck.ai/favicon.ico
 // ==/UserScript==
 
@@ -410,7 +410,7 @@ function waitForElement(selector) {
 
 GM_addStyle(`
 /* Make space for the search bubble at the top without blocking the first message or "free plan" text on new messages */
-body > div > div > div > main > section:nth-of-type(2) > div:nth-of-type(2) {
+body > div > div > div > div > main > section:nth-of-type(2) > div:nth-of-type(2) {
   padding-top: 60px !important;
 }
 /* Light theme (default) */
