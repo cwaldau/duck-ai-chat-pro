@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duck.ai Chat Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Adds Claude-style split-view code panels to duck.ai (and maybe other future enhancements)
 // @author       Christopher Waldau
 // @license      GNU GPLv3
@@ -1541,30 +1541,50 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
                 // timestamps on existing assistant messages
                 scheduleTimestamps(target);
 
-                const observer = new MutationObserver((mutations) => {
+                // Observer 1: childList — catches new nodes being added to the DOM
+                const childObserver = new MutationObserver((mutations) => {
                     for (const m of mutations) {
                         for (const node of m.addedNodes) {
                             if (node.nodeType !== 1) continue;
 
-                            // Check for new code block structure
                             if (node.hasAttribute && node.hasAttribute('data-streamdown')) {
                                 this.convertCodeBlocks(node.parentNode);
-                            }
-                            // Check for old structure
-                            else if (node.tagName === 'PRE') {
+                            } else if (node.tagName === 'PRE') {
                                 this.convertCodeBlocks(node.parentNode);
                             } else {
                                 this.convertCodeBlocks(node);
                             }
 
-                            // timestamps on any new assistant messages
                             scheduleTimestamps(target);
                         }
                     }
                 });
 
-                observer.observe(target, {
+                childObserver.observe(target, {
                     childList: true,
+                    subtree: true
+                });
+
+                // Observer 2: attributes — watches for data-activeresponse flipping to "true"
+                // which signals that the assistant message (and its code blocks) are complete.
+                const attrObserver = new MutationObserver((mutations) => {
+                    for (const m of mutations) {
+                        if (
+                            m.type === 'attributes' &&
+                            m.attributeName === 'data-activeresponse' &&
+                            m.target.getAttribute('data-activeresponse') === 'true'
+                        ) {
+                            // The response is now complete — convert any pending code blocks
+                            // inside this specific assistant message node
+                            this.convertCodeBlocks(m.target);
+                            scheduleTimestamps(target);
+                        }
+                    }
+                });
+
+                attrObserver.observe(target, {
+                    attributes: true,
+                    attributeFilter: ['data-activeresponse'],
                     subtree: true
                 });
             },
@@ -1588,6 +1608,14 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
 
                 for (const block of allCodeBlocks) {
                     // Mark as converted
+                    const parentResponse = block.closest('[data-activeresponse]');
+                    const isComplete = !parentResponse || parentResponse.getAttribute('data-activeresponse') === 'true';
+
+                    if (!isComplete) {
+                        // Don't mark it yet — we'll pick it up when data-activeresponse flips
+                        continue;
+                    }
+
                     block.classList.add('file-panel-converted');
 
                     let code, detectedLang;
